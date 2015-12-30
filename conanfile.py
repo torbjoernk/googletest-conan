@@ -5,7 +5,7 @@ class GoogleTestConan(ConanFile):
     version = '1.7.0'
     settings = ['os', 'compiler', 'build_type', 'arch']
     generators = ['cmake']
-    url = 'https://github.com/google/googletest.git'
+    url = 'https://github.com/google/googletest-conan.git'
     options = {
         'BUILD_SHARED_LIBS':       ['ON', 'OFF'], # Build shared libraries (DLLs).
         'gtest_force_shared_crt':  ['ON', 'OFF'], # Use shared (DLL) run-time lib even when Google Test is built as static lib.
