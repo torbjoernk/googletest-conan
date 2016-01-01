@@ -36,6 +36,6 @@ A full list of options and defaults can be found in [`conanfile.py`](conanfile.p
 ```bash
 # Example
 conan install --build=missing \
-              -o googletest:GTEST_USE_OWN_TR1_TUPLE=0 \
-              -o googletest:GTEST_HAS_TR1_TUPLE=1
+              -o googletest:GTEST_USE_OWN_TR1_TUPLE=1 \
+              -o googletest:GTEST_HAS_TR1_TUPLE=0
 ```
