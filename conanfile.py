@@ -65,6 +65,8 @@ class GoogleTestConan(ConanFile):
         self.copy('README', dst='.', src=self.name, keep_path=True)
 
         # Built artifacts
+        self.copy('*.lib', dst='lib', src=self.build_dir, keep_path=False)
+        self.copy('*.dll', dst='bin', src=self.build_dir, keep_path=False)
         if self.options['BUILD_SHARED_LIBS'] == 'ON':
             self.copy('libgtest.so', dst='lib', src=self.build_dir, keep_path=False)
             self.copy('libgtest_main.so', dst='lib', src=self.build_dir, keep_path=False)
