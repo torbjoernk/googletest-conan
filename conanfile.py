@@ -30,7 +30,7 @@ class GoogleTestConan(ConanFile):
         'GTEST_HAS_PTHREAD': [None, '0', '1']
     }
     default_options = ('BUILD_SHARED_LIBS=OFF',
-                       'gtest_force_shared_crt=OFF',
+                       'gtest_force_shared_crt=ON',
                        'gtest_build_tests=OFF',
                        'gtest_build_samples=OFF',
                        'gtest_disable_pthreads=OFF',
@@ -48,7 +48,10 @@ class GoogleTestConan(ConanFile):
     def build(self):
         if not os.path.isdir("{conan_dir}{sep}{src_dir}".format(conan_dir=self.conanfile_directory, sep=os.sep, src_dir=self.name)):
             self.source()
+
         option_defines = ' '.join("-D%s=%s" % (opt, val) for (opt, val) in self.options.iteritems() if val is not None)
+        option_defines += ' -DGTEST_CREATE_SHARED_LIBRARY=' + ('1' if self.options['BUILD_SHARED_LIBS'] == 'ON' else '0')
+
         self.run("cmake {src_dir} -B{build_dir} {defines}".format(src_dir=self.name,
                                                                   build_dir=self.build_dir,
                                                                   defines=option_defines))
@@ -100,6 +103,8 @@ class GoogleTestConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs.append('gtest')
+        if self.options['BUILD_SHARED_LIBS'] == 'ON':
+            self.cpp_info.defines.append("GTEST_LINKED_AS_SHARED_LIBRARY=1")
 
         if self.settings.os == 'Linux' or self.options['GTEST_HAS_PTHREAD'] == '1':
             self.cpp_info.libs.append('pthread')
