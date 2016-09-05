@@ -11,7 +11,7 @@ Declare the dependency.
 If you are using `conanfile.txt`:
 ```
 [requires]
-googletest/1.8.0@astrohawk/latest
+googletest/1.8.0@astrohawk/stable
 ```
 
 If you are using `conanfile.py`:
@@ -21,10 +21,10 @@ from conans import *
 
 class MyProjectConan(ConanFile):
     # Either:
-    requires = 'googletest/1.8.0@astrohawk/latest'
+    requires = 'googletest/1.8.0@astrohawk/stable'
     # Or:
     def requirements(self):
-        self.requires('googletest/1.8.0@astrohawk/latest')
+        self.requires('googletest/1.8.0@astrohawk/stable')
 
     # ...
 ```
