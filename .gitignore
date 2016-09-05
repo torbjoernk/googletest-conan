@@ -1,4 +1,4 @@
-/googletest
+/googletest-release-*
 
 /build
 /conanfile.pyc

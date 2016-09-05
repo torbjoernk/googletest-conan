@@ -2,7 +2,7 @@
 
 This repository holds the [conan](https://www.conan.io/) build script for the [Google Test](https://github.com/google/googletest) framework.
 
-Currently the script is configured to publish version `1.7.0` of Google Test.
+Currently the script is configured to publish version `1.8.0` of Google Test.
 
 ## Usage
 
@@ -11,7 +11,7 @@ Declare the dependency.
 If you are using `conanfile.txt`:
 ```
 [requires]
-googletest/1.7.0@azriel91/stable-3
+googletest/1.8.0@astrohawk/latest
 ```
 
 If you are using `conanfile.py`:
@@ -21,10 +21,10 @@ from conans import *
 
 class MyProjectConan(ConanFile):
     # Either:
-    requires = 'googletest/1.7.0@azriel91/stable-3'
+    requires = 'googletest/1.8.0@astrohawk/latest'
     # Or:
     def requirements(self):
-        self.requires('googletest/1.7.0@azriel91/stable-3')
+        self.requires('googletest/1.8.0@astrohawk/latest')
 
     # ...
 ```

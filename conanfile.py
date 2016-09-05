@@ -1,14 +1,17 @@
 from conans import ConanFile
 import os
+from conans.tools import download
+from conans.tools import unzip
 
 
 class GoogleTestConan(ConanFile):
     name = 'googletest'
-    license = 'Copyright 2008, Google Inc.'  # See https://github.com/google/googletest/blob/release-1.7.0/LICENSE
-    version = '1.7.0'
+    license = 'Copyright 2008, Google Inc.'  # See https://github.com/google/googletest/blob/release-1.8.0/googletest/LICENSE
+    version = '1.8.0'
+    release_version = 'release-{ver}'.format(ver=version)
     settings = ['os', 'compiler', 'build_type', 'arch']
     generators = ['cmake']
-    url = 'https://github.com/google/googletest-conan.git'
+    url = 'https://github.com/astrohawk/googletest-conan.git'
     options = {
         'BUILD_SHARED_LIBS': ['ON', 'OFF'],       # Build shared libraries (DLLs).
         'gtest_force_shared_crt': ['ON', 'OFF'],  # Use shared (DLL) run-time lib even when Google Test is built as static lib.
@@ -38,38 +41,39 @@ class GoogleTestConan(ConanFile):
                        'GTEST_HAS_TR1_TUPLE=None',
                        'GTEST_HAS_PTHREAD=None')
 
+    src_dir = '{n}-{release_ver}{sep}{n}'.format(n=name, release_ver=release_version, sep=os.sep)
     build_dir = 'build'
 
     def source(self):
-        google_test_url = 'https://github.com/google/googletest.git'
-        release_tag = 'release-{version}'.format(version=self.version)
-        self.run("git clone {url} --branch {branch} --depth 1".format(url=google_test_url, branch=release_tag))
+        zip_name = '{release_version}.zip'.format(release_version=self.release_version)
+        url = 'https://github.com/google/googletest/archive/{zip}'.format(zip=zip_name)
+        download(url, zip_name)
+        unzip(zip_name)
+        os.unlink(zip_name)
 
     def build(self):
-        if not os.path.isdir("{conan_dir}{sep}{src_dir}".format(conan_dir=self.conanfile_directory, sep=os.sep, src_dir=self.name)):
+        if not os.path.isdir("{conan_dir}{sep}{src_dir}".format(conan_dir=self.conanfile_directory, sep=os.sep, src_dir=self.src_dir)):
             self.source()
 
         option_defines = ' '.join("-D%s=%s" % (opt, val) for (opt, val) in self.options.iteritems() if val is not None)
         option_defines += ' -DGTEST_CREATE_SHARED_LIBRARY=' + ('1' if self.options['BUILD_SHARED_LIBS'] == 'ON' else '0')
 
-        self.run("cmake {src_dir} -B{build_dir} {defines}".format(src_dir=self.name,
-                                                                  build_dir=self.build_dir,
-                                                                  defines=option_defines))
+        self.run("cmake {src_dir} -B{build_dir} {defines}".format(src_dir=self.src_dir, build_dir=self.build_dir, defines=option_defines))
         self.run("cmake --build {build_dir}".format(build_dir=self.build_dir))
 
     def package(self):
-        self.copy('*', dst='cmake', src="{src_dir}/cmake".format(src_dir=self.name), keep_path=True)
-        self.copy('*', dst='include', src="{src_dir}/include".format(src_dir=self.name), keep_path=True)
-        self.copy('CMakeLists.txt', dst='.', src=self.name, keep_path=True)
+        self.copy('*', dst='cmake', src="{src_dir}/cmake".format(src_dir=self.src_dir), keep_path=True)
+        self.copy('*', dst='include', src="{src_dir}/include".format(src_dir=self.src_dir), keep_path=True)
+        self.copy('CMakeLists.txt', dst='.', src=self.src_dir, keep_path=True)
 
         # google mock compiles with google test sources
-        self.copy('*', dst='src', src="{src_dir}/src".format(src_dir=self.name), keep_path=True)
+        self.copy('*', dst='src', src="{src_dir}/src".format(src_dir=self.src_dir), keep_path=True)
 
         # Meta files
-        self.copy('CHANGES', dst='.', src=self.name, keep_path=True)
-        self.copy('CONTRIBUTORS', dst='.', src=self.name, keep_path=True)
-        self.copy('LICENSE', dst='.', src=self.name, keep_path=True)
-        self.copy('README', dst='.', src=self.name, keep_path=True)
+        self.copy('CHANGES', dst='.', src=self.src_dir, keep_path=True)
+        self.copy('CONTRIBUTORS', dst='.', src=self.src_dir, keep_path=True)
+        self.copy('LICENSE', dst='.', src=self.src_dir, keep_path=True)
+        self.copy('README', dst='.', src=self.src_dir, keep_path=True)
 
         # Built artifacts
         self.copy('*.lib', dst='lib', src=self.build_dir, keep_path=False)
@@ -102,7 +106,7 @@ class GoogleTestConan(ConanFile):
         # self.copy('*', dst='test', src="{src_dir}/test".format(src_dir=self.name))
 
     def package_info(self):
-        self.cpp_info.libs.append('gtest')
+        self.cpp_info.libs = ['gtest', 'gtest_main']
         if self.options['BUILD_SHARED_LIBS'] == 'ON':
             self.cpp_info.defines.append("GTEST_LINKED_AS_SHARED_LIBRARY=1")
 
