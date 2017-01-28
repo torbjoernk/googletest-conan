@@ -5,3 +5,5 @@
 /conaninfo.txt
 /conanbuildinfo.txt
 /conanbuildinfo.cmake
+
+__pycache__/

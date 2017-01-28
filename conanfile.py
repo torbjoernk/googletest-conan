@@ -1,11 +1,11 @@
-from conans import ConanFile
+from conans import ConanFile, CMake
 import os
-from conans.tools import download
-from conans.tools import unzip
+from conans import tools
 
 
 class GoogleTestConan(ConanFile):
     name = 'googletest'
+    description = 'GoogleTest with GoogleMock'
     license = 'Copyright 2008, Google Inc.'  # See https://github.com/google/googletest/blob/release-1.8.0/googletest/LICENSE
     version = '1.8.0'
     release_version = 'release-{ver}'.format(ver=version)
@@ -13,102 +13,93 @@ class GoogleTestConan(ConanFile):
     generators = ['cmake']
     url = 'https://github.com/astrohawk/googletest-conan.git'
     options = {
-        'BUILD_SHARED_LIBS': ['ON', 'OFF'],       # Build shared libraries (DLLs).
-        'gtest_force_shared_crt': ['ON', 'OFF'],  # Use shared (DLL) run-time lib even when Google Test is built as static lib.
-        'gtest_build_tests': ['ON', 'OFF'],       # Build all of gtest's own tests.
-        'gtest_build_samples': ['ON', 'OFF'],     # Build gtest's sample programs.
-        'gtest_disable_pthreads': ['ON', 'OFF'],  # Disable uses of pthreads in gtest.
-
-        # Set this to 0 if your project already uses a tuple library, and GTest should use that library
-        # Set this to 1 if GTest should use its own tuple library
-        'GTEST_USE_OWN_TR1_TUPLE': [None, '0', '1'],
-
-        # Set this to 0 if GTest should not use tuple at all. All tuple features will be disabled
-        'GTEST_HAS_TR1_TUPLE': [None, '0'],
-
-        # If GTest incorrectly detects whether or not the pthread library exists on your system, you can force it
-        # by setting this option value to:
-        #   1 - if pthread does actually exist
-        #   0 - if pthread does not actually exist
-        'GTEST_HAS_PTHREAD': [None, '0', '1']
+        'static': [True, False]
     }
-    default_options = ('BUILD_SHARED_LIBS=OFF',
-                       'gtest_force_shared_crt=ON',
-                       'gtest_build_tests=OFF',
-                       'gtest_build_samples=OFF',
-                       'gtest_disable_pthreads=OFF',
-                       'GTEST_USE_OWN_TR1_TUPLE=None',
-                       'GTEST_HAS_TR1_TUPLE=None',
-                       'GTEST_HAS_PTHREAD=None')
+    default_options = (
+        'static=True'
+    )
+    exports = ['FindGoogleTest.cmake']
 
-    src_dir = '{n}-{release_ver}{sep}{n}'.format(n=name, release_ver=release_version, sep=os.sep)
+    src_dir = '{n}-{release_ver}'.format(n=name, release_ver=release_version)
     build_dir = 'build'
 
     def source(self):
-        zip_name = '{release_version}.zip'.format(release_version=self.release_version)
-        url = 'https://github.com/google/googletest/archive/{zip}'.format(zip=zip_name)
-        download(url, zip_name)
-        unzip(zip_name)
-        os.unlink(zip_name)
+        if not os.path.isdir("{conan_dir}{sep}{src_dir}".format(conan_dir=self.conanfile_directory, sep=os.sep, src_dir=self.src_dir)):
+            zip_name = '{release_version}.zip'.format(release_version=self.release_version)
+            url = 'https://github.com/google/googletest/archive/{zip}'.format(zip=zip_name)
+            self.output.info("Downloading %s" % zip_name)
+            tools.download(url, zip_name)
+            tools.unzip(zip_name)
+            os.unlink(zip_name)
 
     def build(self):
-        if not os.path.isdir("{conan_dir}{sep}{src_dir}".format(conan_dir=self.conanfile_directory, sep=os.sep, src_dir=self.src_dir)):
-            self.source()
+        self.source()
 
-        option_defines = ' '.join("-D%s=%s" % (opt, val) for (opt, val) in self.options.iteritems() if val is not None)
-        option_defines += ' -DGTEST_CREATE_SHARED_LIBRARY=' + ('1' if self.options['BUILD_SHARED_LIBS'] == 'ON' else '0')
+        static = "-DBUILD_SHARED_LIBS=%s" % ("OFF" if self.options.static else "ON")
 
-        self.run("cmake {src_dir} -B{build_dir} {defines}".format(src_dir=self.src_dir, build_dir=self.build_dir, defines=option_defines))
-        self.run("cmake --build {build_dir}".format(build_dir=self.build_dir))
+        cmake = CMake(self.settings)
+        cmd_line = 'cmake "%s" -B%s %s %s' % (self.src_dir, self.build_dir, cmake.command_line, static)
+        self.output.info("CMake Command: %s" % cmd_line)
+        self.run(cmd_line)
+
+        cmd_line = 'cmake --build "%s" %s' % (self.build_dir, cmake.build_config)
+        self.output.info("CMake Command: %s" % cmd_line)
+        self.run(cmd_line)
 
     def package(self):
-        self.copy('*', dst='cmake', src="{src_dir}/cmake".format(src_dir=self.src_dir), keep_path=True)
-        self.copy('*', dst='include', src="{src_dir}/include".format(src_dir=self.src_dir), keep_path=True)
-        self.copy('CMakeLists.txt', dst='.', src=self.src_dir, keep_path=True)
+        # Headers
+        self.copy('*.h', dst='include', src="{src_dir}/googletest/include".format(src_dir=self.src_dir), keep_path=True)
+        self.copy('*.h', dst='include', src="{src_dir}/googlemock/include".format(src_dir=self.src_dir), keep_path=True)
 
-        # google mock compiles with google test sources
-        self.copy('*', dst='src', src="{src_dir}/src".format(src_dir=self.src_dir), keep_path=True)
+        # Custom CMake Find Module
+        self._patch_cmake_find_module()
+        self.copy('FindGoogleTest.cmake', dst='.', src='.')
 
         # Meta files
-        self.copy('CHANGES', dst='.', src=self.src_dir, keep_path=True)
-        self.copy('CONTRIBUTORS', dst='.', src=self.src_dir, keep_path=True)
-        self.copy('LICENSE', dst='.', src=self.src_dir, keep_path=True)
-        self.copy('README', dst='.', src=self.src_dir, keep_path=True)
+        self.copy('CHANGES', dst='.', src="%s/googletest" % self.src_dir, keep_path=True)
+        self.copy('CONTRIBUTORS', dst='.', src="%s/googletest" % self.src_dir, keep_path=True)
+        self.copy('LICENSE', dst='.', src="%s/googletest" % self.src_dir, keep_path=True)
+        self.copy('README', dst='.', src="%s/googletest" % self.src_dir, keep_path=True)
 
         # Built artifacts
-        self.copy('*.lib', dst='lib', src=self.build_dir, keep_path=False)
-        self.copy('*.dll', dst='bin', src=self.build_dir, keep_path=False)
-        if self.options['BUILD_SHARED_LIBS'] == 'ON':
-            self.copy('libgtest.so', dst='lib', src=self.build_dir, keep_path=False)
-            self.copy('libgtest_main.so', dst='lib', src=self.build_dir, keep_path=False)
+        if self.settings.os == "Linux":
+            if self.options.static:
+                self.copy('*.a', dst='lib', src=self.build_dir, keep_path=False)
+            else:
+                self.copy('*.so', dst='lib', src=self.build_dir, keep_path=False)
+        elif self.settings.os == "Windows":
+            if not self.options.static:
+                self.copy('*.dll', dst='bin', src=self.build_dir, keep_path=False)
+            self.copy('*.lib', dst='lib', src=self.build_dir, keep_path=False)
         else:
-            self.copy('libgtest.a', dst='lib', src=self.build_dir, keep_path=False)
-            self.copy('libgtest_main.a', dst='lib', src=self.build_dir, keep_path=False)
-
-        # Commented code intentionally left here
-        # ======================================
-        # IDE sample files
-        # self.copy('*', dst='codegear', src="{src_dir}/codegear".format(src_dir=self.name))
-        # self.copy('*', dst='m4', src="{src_dir}/m4".format(src_dir=self.name))
-        # self.copy('*', dst='make', src="{src_dir}/make".format(src_dir=self.name))
-        # self.copy('*', dst='msvc', src="{src_dir}/msvc".format(src_dir=self.name))
-        # self.copy('*', dst='xcode', src="{src_dir}/xcode".format(src_dir=self.name))
-
-        # Autoconf/Automake
-        # self.copy('configure.ac', dst='configure.ac', src=self.name)
-        # self.copy('Makefile.am', dst='Makefile.am', src=self.name)
-
-        # self.copy('*', dst='samples', src="{src_dir}/samples".format(src_dir=self.name))
-
-        # Files not used by downstream
-        # self.copy('*', dst='build-aux', src="{src_dir}/build-aux".format(src_dir=self.name))
-        # self.copy('*', dst='scripts', src="{src_dir}/scripts".format(src_dir=self.name))
-        # self.copy('*', dst='test', src="{src_dir}/test".format(src_dir=self.name))
+            self.output.error("Operating System not (yet) supported: %s" % self.settings.os)
+            exit(-1)
 
     def package_info(self):
-        self.cpp_info.libs = ['gtest', 'gtest_main']
-        if self.options['BUILD_SHARED_LIBS'] == 'ON':
-            self.cpp_info.defines.append("GTEST_LINKED_AS_SHARED_LIBRARY=1")
+        self.cpp_info.libs = ['gtest', 'gtest_main', 'gmock', 'gmock_main']
+        if self.settings.os == "Linux":
+            self.cpp_info.libs = ['lib%s' % lib for lib in self.cpp_info.libs]
+            if self.options.static:
+                self.cpp_info.libs = ['%s.a' % lib for lib in self.cpp_info.libs]
+            else:
+                self.cpp_info.libs = ['%s.so' % lib for lib in self.cpp_info.libs]
 
-        if self.settings.os == 'Linux' or self.options['GTEST_HAS_PTHREAD'] == '1':
-            self.cpp_info.libs.append('pthread')
+    def _patch_cmake_find_module(self):
+        tools.replace_in_file('FindGoogleTest.cmake',
+                              'CONAN_REPLACE_SHARED_OR_STATIC',
+                              'STATIC' if self.options.static else 'SHARED')
+        tools.replace_in_file('FindGoogleTest.cmake',
+                              'CONAN_REPLACE_VERSION',
+                              '%s' % self.version)
+        if self.settings.os == "Linux":
+            tools.replace_in_file('FindGoogleTest.cmake',
+                                  'CONAN_REPLACE_LIBRARY_SUFFIX',
+                                  'a' if self.options.static else 'so')
+            if self.options.static:
+                tools.replace_in_file('FindGoogleTest.cmake',
+                                      'CONAN_REPLACE_ADDITIONAL_GMOCK_PROPERTIES',
+                                      '')
+            else:
+                tools.replace_in_file('FindGoogleTest.cmake',
+                                      'CONAN_REPLACE_ADDITIONAL_GMOCK_PROPERTIES',
+                                      'INTERFACE_COMPILE_DEFINITIONS GTEST_LINKED_AS_SHARED_LIBRARY=1')
