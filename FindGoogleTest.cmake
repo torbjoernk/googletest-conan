@@ -1,11 +1,16 @@
+include(FindPackageHandleStandardArgs)
+
 find_path(GOOGLETEST_INCLUDE_DIR
           NAMES gtest/gtest.h
           PATHS ${CONAN_INCLUDE_DIRS_GOOGLETEST})
 find_path(GOOGLETEST_LIBRARY_DIR
           NAMES libgmock_main.a
                 libgmock_main.so
-                libgmock_main.lib
+                gmock_main.lib
           PATHS ${CONAN_LIB_DIRS_GOOGLETEST})
+find_path(GOOGLETEST_BINARY_DIR
+          NAMES gmock_main.dll
+          PATHS ${CONAN_BIN_DIRS_GOOGLETEST})
 
 set(GOOGLETEST_VERSION CONAN_REPLACE_VERSION)
 set(GOOGLETEST_INCLUDE_DIRS ${GOOGLETEST_INCLUDE_DIR})
@@ -20,9 +25,10 @@ if(NOT TARGET GoogleTest::gmock_main)
     set_target_properties(GoogleTest::gmock_main
                           PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${GOOGLETEST_INCLUDE_DIR}
                                      IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
-                                     IMPORTED_LOCATION "${GOOGLETEST_LIBRARY_DIR}/libgmock_main.CONAN_REPLACE_LIBRARY_SUFFIX"
-                                     CONAN_REPLACE_ADDITIONAL_GMOCK_PROPERTIES
-                                     INTERFACE_LINK_LIBRARIES Threads::Threads)
+                                     CONAN_REPLACE_IMPORTED_LOCATION
+                                     CONAN_REPLACE_IMPORTED_IMPLIB
+                                     CONAN_REPLACE_INTERFACE_COMPILE_DEFINITIONS
+                                     CONAN_REPLACE_INTERFACE_LINK_LIBRARIES)
 endif()
 
 find_package_handle_standard_args(GoogleTest

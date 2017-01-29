@@ -7,3 +7,6 @@
 /conanbuildinfo.cmake
 
 __pycache__/
+
+.idea/
+test_package/build/

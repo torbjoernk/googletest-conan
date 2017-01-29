@@ -1,6 +1,5 @@
-from conans import ConanFile, CMake
+from conans import ConanFile, CMake, tools
 import os
-from conans import tools
 
 
 class GoogleTestConan(ConanFile):
@@ -13,10 +12,12 @@ class GoogleTestConan(ConanFile):
     generators = ['cmake']
     url = 'https://github.com/astrohawk/googletest-conan.git'
     options = {
-        'static': [True, False]
+        'static': [True, False],
+        'shared_crt': [True, False]
     }
     default_options = (
-        'static=True'
+        'static=True',
+        'shared_crt=True'
     )
     exports = ['FindGoogleTest.cmake']
 
@@ -36,9 +37,10 @@ class GoogleTestConan(ConanFile):
         self.source()
 
         static = "-DBUILD_SHARED_LIBS=%s" % ("OFF" if self.options.static else "ON")
+        shared_crt = '-Dgtest_force_shared_crt=%s' % ('ON' if self.options.shared_crt else 'OFF')
 
         cmake = CMake(self.settings)
-        cmd_line = 'cmake "%s" -B%s %s %s' % (self.src_dir, self.build_dir, cmake.command_line, static)
+        cmd_line = 'cmake "%s" -B%s %s %s %s' % (self.src_dir, self.build_dir, cmake.command_line, static, shared_crt)
         self.output.info("CMake Command: %s" % cmd_line)
         self.run(cmd_line)
 
@@ -72,8 +74,7 @@ class GoogleTestConan(ConanFile):
                 self.copy('*.dll', dst='bin', src=self.build_dir, keep_path=False)
             self.copy('*.lib', dst='lib', src=self.build_dir, keep_path=False)
         else:
-            self.output.error("Operating System not (yet) supported: %s" % self.settings.os)
-            exit(-1)
+            raise NotImplementedError("Operating System not (yet) supported: %s" % self.settings.os)
 
     def package_info(self):
         self.cpp_info.libs = ['gtest', 'gtest_main', 'gmock', 'gmock_main']
@@ -91,15 +92,36 @@ class GoogleTestConan(ConanFile):
         tools.replace_in_file('FindGoogleTest.cmake',
                               'CONAN_REPLACE_VERSION',
                               '%s' % self.version)
+
+        if self.options.static:
+            _interface_compile_definitions = None
+        else:
+            _interface_compile_definitions = 'GTEST_LINKED_AS_SHARED_LIBRARY=1'
+
         if self.settings.os == "Linux":
-            tools.replace_in_file('FindGoogleTest.cmake',
-                                  'CONAN_REPLACE_LIBRARY_SUFFIX',
-                                  'a' if self.options.static else 'so')
+            _library_name = '${GOOGLETEST_LIBRARY_DIR}/libgmock_main.' + 'a' if self.options.static else 'so'
+            _import_library_name = None
+            _interface_link_libraries = "Threads::Threads"
+        elif self.settings.os == "Windows":
+            _interface_link_libraries = None
             if self.options.static:
-                tools.replace_in_file('FindGoogleTest.cmake',
-                                      'CONAN_REPLACE_ADDITIONAL_GMOCK_PROPERTIES',
-                                      '')
+                _library_name = '${GOOGLETEST_LIBRARY_DIR}/gmock_main.lib'
+                _import_library_name = None
             else:
-                tools.replace_in_file('FindGoogleTest.cmake',
-                                      'CONAN_REPLACE_ADDITIONAL_GMOCK_PROPERTIES',
-                                      'INTERFACE_COMPILE_DEFINITIONS GTEST_LINKED_AS_SHARED_LIBRARY=1')
+                _library_name = '${GOOGLETEST_BINARY_DIR}/gmock_main.dll'
+                _import_library_name = '${GOOGLETEST_LIBRARY_DIR}/gmock_main.lib'
+        else:
+            raise NotImplementedError("Operating System not (yet) supported: %s" % self.settings.os)
+
+        tools.replace_in_file('FindGoogleTest.cmake',
+                              'CONAN_REPLACE_IMPORTED_LOCATION',
+                              ('IMPORTED_LOCATION "%s"' % _library_name) if _library_name else '')
+        tools.replace_in_file('FindGoogleTest.cmake',
+                              'CONAN_REPLACE_IMPORTED_IMPLIB',
+                              ('IMPORTED_IMPLIB "%s"' % _import_library_name) if _import_library_name else '')
+        tools.replace_in_file('FindGoogleTest.cmake',
+                              'CONAN_REPLACE_INTERFACE_COMPILE_DEFINITIONS',
+                              ('INTERFACE_COMPILE_DEFINITIONS %s' % _interface_compile_definitions) if _interface_compile_definitions else '')
+        tools.replace_in_file('FindGoogleTest.cmake',
+                              'CONAN_REPLACE_INTERFACE_LINK_LIBRARIES',
+                              ('INTERFACE_LINK_LIBRARIES %s' % _interface_link_libraries) if _interface_link_libraries else '')

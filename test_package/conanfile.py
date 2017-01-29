@@ -11,6 +11,9 @@ class GoogletestReuseConan(ConanFile):
     requires = "googletest/1.8.0@%s/%s" % (username, channel)
     generators = "cmake"
 
+    def imports(self):
+        self.copy('*.dll', dst='bin', src='bin')
+
     def build(self):
         cmake = CMake(self.settings)
         self.run('cmake "%s" %s' % (self.conanfile_directory, cmake.command_line))
