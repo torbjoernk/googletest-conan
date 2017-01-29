@@ -2,6 +2,17 @@ from conans import ConanFile, CMake, tools
 import os
 
 
+def map_vs_compiler(compiler):
+    _map_vs_compiler = {
+        "14": {
+            "win": "v140",
+            "xp": "v140_xp"
+        }
+    }
+
+    return _map_vs_compiler[str(compiler.version)]
+
+
 class GoogleTestConan(ConanFile):
     name = 'googletest'
     description = 'GoogleTest with GoogleMock'
@@ -13,11 +24,13 @@ class GoogleTestConan(ConanFile):
     url = 'https://github.com/astrohawk/googletest-conan.git'
     options = {
         'static': [True, False],
-        'shared_crt': [True, False]
+        'shared_crt': [True, False],
+        'win_xp': [None, True, False]
     }
     default_options = (
         'static=True',
-        'shared_crt=True'
+        'shared_crt=True',
+        'win_xp=None'
     )
     exports = ['FindGoogleTest.cmake']
 
@@ -25,7 +38,8 @@ class GoogleTestConan(ConanFile):
     build_dir = 'build'
 
     def source(self):
-        if not os.path.isdir("{conan_dir}{sep}{src_dir}".format(conan_dir=self.conanfile_directory, sep=os.sep, src_dir=self.src_dir)):
+        if not os.path.isdir("{conan_dir}{sep}{src_dir}".format(conan_dir=self.conanfile_directory, sep=os.sep,
+                                                                src_dir=self.src_dir)):
             zip_name = '{release_version}.zip'.format(release_version=self.release_version)
             url = 'https://github.com/google/googletest/archive/{zip}'.format(zip=zip_name)
             self.output.info("Downloading %s" % zip_name)
@@ -38,9 +52,15 @@ class GoogleTestConan(ConanFile):
 
         static = "-DBUILD_SHARED_LIBS=%s" % ("OFF" if self.options.static else "ON")
         shared_crt = '-Dgtest_force_shared_crt=%s' % ('ON' if self.options.shared_crt else 'OFF')
+        if self.settings.os == "Windows":
+            win_xp = '-T %s' % (map_vs_compiler(self.settings.compiler)["xp"] if self.options.win_xp else
+                                map_vs_compiler(self.settings.compiler)["win"])
+        else:
+            win_xp = ''
 
         cmake = CMake(self.settings)
-        cmd_line = 'cmake "%s" -B%s %s %s %s' % (self.src_dir, self.build_dir, cmake.command_line, static, shared_crt)
+        cmd_line = 'cmake "%s" -B%s %s %s %s %s' % (
+            self.src_dir, self.build_dir, cmake.command_line, static, shared_crt, win_xp)
         self.output.info("CMake Command: %s" % cmd_line)
         self.run(cmd_line)
 
